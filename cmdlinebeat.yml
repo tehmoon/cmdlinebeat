@@ -1,0 +1,8 @@
+name: cmdlinebeat
+
+cmdlinebeat.commands:
+  - command: du -hd 1 .
+    sleep: 10s
+
+output.console:
+  pretty: true

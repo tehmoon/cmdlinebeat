@@ -1,0 +1,5 @@
+*.swp
+cmdlinebeat-*.tar.gz
+cmdlinebeat
+data/
+logs/
