@@ -54,6 +54,10 @@ func New(b *beat.Beat, config *common.Config) (beat.Beater, error) {
       return nil, errors.Errorf("Config #%d is missing a command entry", entryNumber)
     }
 
+    if command.Name == "" {
+      return nil, errors.Errorf("Config #%d is missing a name entry", entryNumber)
+    }
+
     if command.Shell == "" {
       shell := os.Getenv("SHELL")
       if shell == "" {

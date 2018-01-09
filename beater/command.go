@@ -21,6 +21,7 @@ type Command struct {
   Sleep time.Duration `config:"sleep"`
   Timeout time.Duration `config:"timeout"`
   Fields common.MapStr `config:"fields"`
+  Name string `config:"name"`
   entryNumber int
 }
 
@@ -175,6 +176,7 @@ func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), client bea
           "cmdlinebeat": &common.MapStr{
             "line": line,
             "number": i,
+            "name": command.Name,
           },
         },
       })
