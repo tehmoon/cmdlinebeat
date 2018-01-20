@@ -1,6 +1,7 @@
 package beater
 
 import (
+  "fmt"
   "github.com/elastic/beats/libbeat/beat"
   "github.com/elastic/beats/libbeat/common"
   "github.com/elastic/beats/libbeat/logp"
@@ -33,7 +34,7 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
 
   client, err := b.Publisher.ConnectWith(config)
   if err != nil {
-    logp.Err(errors.Wrapf(err, "Enable to connect the publisher to config #%d", command.entryNumber).Error())
+    logp.Err(errors.Wrapf(err, "Enable to connect the publisher for command %s", command.Name).Error())
     return
   }
 
@@ -42,7 +43,7 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
 
   for {
     if tries == 0 {
-      logp.Err("Stop retrying command #%d after 3 tries", command.entryNumber)
+      logp.Err("Stop retrying command %s after 3 tries", command.Name)
 
       break
     }
@@ -52,14 +53,14 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
     now := time.Now()
     id := GenerateId(8)
     if id == "" {
-      logp.Err(errors.Errorf("Error generating new command id in command #%d", command.entryNumber).Error())
+      logp.Err(errors.Errorf("Error generating new command id in command %s", command.Name).Error())
       tries = decrementAfterSleep(tries, SLEEP_TIME)
       continue
     }
 
     stderrChan, err := CreateAndReadAllFromFn(cmd.StderrPipe)
     if err != nil {
-      logp.Err(errors.Wrapf(err, "Error in reading from stderr in command #%d", command.entryNumber).Error())
+      logp.Err(errors.Wrapf(err, "Error in reading from stderr in command %s", command.Name).Error())
       tries = decrementAfterSleep(tries, SLEEP_TIME)
       continue
     }
@@ -67,46 +68,47 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
     go func() {
       err := <- stderrChan
       if err != nil {
-        logp.Err(errors.Wrapf(err, "Error in command #%d, retrying...", command.entryNumber).Error())
+        logp.Err(errors.Wrapf(err, "Error in command %s, retrying...", command.Name).Error())
       }
     }()
 
     doneReading, err := ReadLineFromReaderFnAndPublish(cmd.StdoutPipe, client, &command, now, id)
     if err != nil {
-      logp.Err(errors.Wrapf(err, "Unable to open stdout in command #%d, retrying...", command.entryNumber).Error())
+      logp.Err(errors.Wrapf(err, "Unable to open stdout in command %s, retrying...", command.Name).Error())
 
       tries = decrementAfterSleep(tries, SLEEP_TIME)
       continue
     }
 
-    err = StartAndWaitCommand(cmd, doneReading)
+    lineRead, err := StartAndWaitCommand(cmd, doneReading)
     if err != nil {
-      logp.Err(errors.Wrapf(err, "Error starting or waiting command #%d, retrying...", command.entryNumber).Error())
+      logp.Err(errors.Wrapf(err, "Error starting or waiting command %s after %d line read, retrying...", command.Name, lineRead).Error())
 
       tries = decrementAfterSleep(tries, SLEEP_TIME)
       continue
     }
 
+    logp.Info(fmt.Sprintf("Command %s has sent %d lines", command.Name, lineRead))
     time.Sleep(command.Sleep)
   }
 
   sync <- struct{}{}
 }
 
-func StartAndWaitCommand(cmd *exec.Cmd, wait chan struct{}) (error) {
+func StartAndWaitCommand(cmd *exec.Cmd, wait chan int64) (int64, error) {
   err := cmd.Start()
   if err != nil {
-    return errors.Wrap(err, "Error creating command")
+    return 0, errors.Wrap(err, "Error creating command")
   }
 
-  <- wait
+  lineRead := <- wait
 
   err = cmd.Wait()
   if err != nil {
-    return errors.Wrap(err, "Error executing command")
+    return lineRead, errors.Wrap(err, "Error executing command")
   }
 
-  return nil
+  return lineRead, nil
 }
 
 func CreateAndReadAllFromFn(fn func() (io.ReadCloser, error)) (chan error, error) {
@@ -139,25 +141,27 @@ func CreateAndReadAllFromFn(fn func() (io.ReadCloser, error)) (chan error, error
   return syncBack, nil
 }
 
-func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), client beat.Client, command *Command, now time.Time, id string) (chan struct{}, error) {
+func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), client beat.Client, command *Command, now time.Time, id string) (chan int64, error) {
   r, err := fn()
   if err != nil {
     return nil, errors.Wrap(err, "Error creating reader")
   }
 
-  done := make(chan struct{})
+  done := make(chan int64)
 
   reader := bufio.NewReader(r)
   go func() {
 
-    for i := int64(0);; i++ {
+    var i int64 = 0
+
+    for ;; i++ {
       line, err := reader.ReadString('\n')
       if err != nil {
         if err == io.EOF {
           break
         }
 
-        logp.Err(errors.Wrapf(err, "Error reading line in command #%d, killing command and retring...", command.entryNumber).Error())
+        logp.Err(errors.Wrapf(err, "Error reading line in command %s, killing command and retring...", command.Name).Error())
 
         break
       }
@@ -184,7 +188,7 @@ func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), client bea
       })
     }
 
-    done <- struct{}{}
+    done <- i
   }()
 
   return done, nil

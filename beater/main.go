@@ -63,7 +63,7 @@ func New(b *beat.Beat, config *common.Config) (beat.Beater, error) {
     if command.Shell == "" {
       shell := os.Getenv("SHELL")
       if shell == "" {
-        return nil, errors.Errorf("Config #%d is missing a shell entry and SHELL environment variable is not found", entryNumber)
+        return nil, errors.Errorf("Config for command %s is missing a shell entry and SHELL environment variable is not found", command.Name)
       }
 
       command.Shell = shell
