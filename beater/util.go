@@ -4,6 +4,8 @@ import (
   "time"
   "fmt"
   "os"
+  "crypto/rand"
+  "io"
 )
 
 var (
@@ -29,4 +31,21 @@ func ForkEnv(env map[string]string, inherit bool) ([]string) {
   }
 
   return newEnv
+}
+
+func GenerateId(n int64) (string) {
+  if n < 1 {
+    return ""
+  }
+
+  n = n / 2
+
+  buff := make([]byte, n)
+
+  _, err := io.ReadFull(rand.Reader, buff)
+  if err != nil {
+    return ""
+  }
+
+  return fmt.Sprintf("%x", buff)
 }

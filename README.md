@@ -68,8 +68,9 @@ cmdlinebeat.commands:
 
 ```
 {
-  "line": string   // line output from the command
-  "number": number // line number from the output
-  "name": string   // name of the command
+  "line": string,     // line output from the command
+  "number": number,   // line number from the output
+  "name": string,     // name of the command
+  "id": string,       // uniq id per command
 }
 ```
