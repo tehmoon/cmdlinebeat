@@ -49,6 +49,7 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
 
     cmd := exec.Command(command.Shell, "-c", command.Command)
     cmd.Env = env
+    now := time.Now()
     id := GenerateId(8)
     if id == "" {
       logp.Err(errors.Errorf("Error generating new command id in command #%d", command.entryNumber).Error())
@@ -70,7 +71,7 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
       }
     }()
 
-    doneReading, err := ReadLineFromReaderFnAndPublish(cmd.StdoutPipe, client, &command, id)
+    doneReading, err := ReadLineFromReaderFnAndPublish(cmd.StdoutPipe, client, &command, now, id)
     if err != nil {
       logp.Err(errors.Wrapf(err, "Unable to open stdout in command #%d, retrying...", command.entryNumber).Error())
 
@@ -138,7 +139,7 @@ func CreateAndReadAllFromFn(fn func() (io.ReadCloser, error)) (chan error, error
   return syncBack, nil
 }
 
-func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), client beat.Client, command *Command, id string) (chan struct{}, error) {
+func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), client beat.Client, command *Command, now time.Time, id string) (chan struct{}, error) {
   r, err := fn()
   if err != nil {
     return nil, errors.Wrap(err, "Error creating reader")
@@ -177,6 +178,7 @@ func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), client bea
             "number": i,
             "id": id,
             "name": command.Name,
+            "started_at": now,
           },
         },
       })

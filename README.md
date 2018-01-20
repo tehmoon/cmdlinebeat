@@ -72,5 +72,6 @@ cmdlinebeat.commands:
   "number": number,   // line number from the output
   "name": string,     // name of the command
   "id": string,       // uniq id per command
+  "started_at": time  // when the command started executing
 }
 ```
