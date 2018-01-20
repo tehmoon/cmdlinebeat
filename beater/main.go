@@ -11,6 +11,7 @@ import (
 
 type Cmdlinebeat struct {
   Commands []*Command `config:"commands"`
+  Env map[string]string `config:"env"`
 }
 
 func (cmdlinebeat *Cmdlinebeat) Run(b *beat.Beat) (error) {
@@ -40,6 +41,7 @@ func New(b *beat.Beat, config *common.Config) (beat.Beater, error) {
 
   cmdlinebeat := &Cmdlinebeat{
     Commands: make([]*Command, 0),
+    Env: make(map[string]string),
   }
 
   err := config.Unpack(cmdlinebeat)
@@ -65,6 +67,16 @@ func New(b *beat.Beat, config *common.Config) (beat.Beater, error) {
       }
 
       command.Shell = shell
+    }
+
+    if command.Env == nil {
+      command.Env = make(map[string]string)
+    }
+
+    for k, v := range cmdlinebeat.Env {
+      if _, found := command.Env[k]; ! found {
+        command.Env[k] = v
+      }
     }
 
     command.entryNumber = entryNumber

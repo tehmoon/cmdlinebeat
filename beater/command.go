@@ -5,7 +5,6 @@ import (
   "github.com/elastic/beats/libbeat/common"
   "github.com/elastic/beats/libbeat/logp"
   "time"
-  "fmt"
   "io"
   "github.com/tehmoon/errors"
   "bufio"
@@ -39,6 +38,7 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
   }
 
   tries := 3
+  env := ForkEnv(command.Env, command.CopyEnv)
 
   for {
     if tries == 0 {
@@ -48,14 +48,7 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
     }
 
     cmd := exec.Command(command.Shell, "-c", command.Command)
-
-    if ! command.CopyEnv {
-      cmd.Env = make([]string, 0)
-    }
-
-    for k, v := range command.Env {
-      cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
-    }
+    cmd.Env = env
 
     stderrChan, err := CreateAndReadAllFromFn(cmd.StderrPipe)
     if err != nil {

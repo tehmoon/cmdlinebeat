@@ -4,6 +4,8 @@ cmdlinebeat.commands:
   - command: du -hd 1 .
     name: du_10s
     sleep: 10s
+cmdlinebeat.env:
+  blah: blah
 
 output.console:
   pretty: true

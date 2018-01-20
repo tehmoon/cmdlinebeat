@@ -34,13 +34,14 @@ go build # A binary name cmdlinebeat will be generated in the directory
 ## Configuration file
 
 ```
+cmdlinebeat.env:       # Global variable to pass to commands
 cmdlinebeat.commands:
   - command: ls /      # Command you want to run in a shell.
     name: ls_slash_1_s # Name of you command
     sleep: 1s          # Sleep for x after running command. By default the command will be re-executed just after so you might want to put some sleep if the command is fast.
     fields:            # Extra data to be merged with .fields field.
     shell: ${SHELL}    # Use the shell specified if the environment variable SHELL is not found
-    env:               # additional environment variable to pass to the child process
+    env:               # additional environment variable to pass to the child process. Will override cmdlinebeat.env if found.
     copy_env: false    # copy all environment to child process
     timeout: 0         # NYI: kill process if timeout is reached
 ```
@@ -48,20 +49,18 @@ cmdlinebeat.commands:
 ## Example Configuration
 
 ```
+cmdlinebeat.env:
+  AWS_PROFILE: dev
 cmdlinebeat.commands:
 # Will get the size of all directories at depth=1 every hour from my_test_bucket
   - command: s3-du -d 1 -b my_test_bucket
     sleep: 1h
     name: s3_du_my_test_bucket_1h
-    env:
-      AWS_PROFILE: dev
     shell: /bin/sh
 # Will get the size of all directories at depth=0 every half hour from my_test_bucket
   - command: s3-du -d 0 -b my_test_bucket
     sleep: 30m
     name: s3_du_my_test_bucket_30m
-    env:
-      AWS_PROFILE: dev
     shell: /bin/sh
 ```
 
