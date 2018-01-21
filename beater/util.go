@@ -78,15 +78,6 @@ func GetUserGroupIds(userStr, groupStr string) (uint32, uint32, error) {
     return maxUint32, maxUint32, errors.Wrap(err, "Error resolving group")
   }
 
-  ok, err := checkUserInGroup(u, g)
-  if err != nil {
-    return maxUint32, maxUint32, errors.Wrap(err, "Error checking if user belongs to group")
-  }
-
-  if ! ok {
-    return maxUint32, maxUint32, errors.New("User doesn't belong to group")
-  }
-
   uid, err := strconv.ParseUint(u.Uid, 10, 32)
   if err != nil {
     return maxUint32, maxUint32, errors.Wrap(err, "Error parsing uid")
@@ -128,28 +119,14 @@ func getGroupId(groupStr string) (*user.Group, error) {
   return g, nil
 }
 
-func checkUserInGroup(u *user.User, g *user.Group) (bool, error) {
-  gids, err := u.GroupIds()
-  if err != nil {
-    return false, err
-  }
-
-  for _, gid := range gids {
-    if gid == g.Gid {
-      return true, nil
-    }
-  }
-
-  return false, nil
-}
-
 func IsRoot() (bool) {
-  u, err := user.Current()
-  if err != nil {
-    return false
+  uid := os.Geteuid()
+
+  if uid == 0 {
+    return true
   }
 
-  return u.Uid == "0"
+  return false
 }
 
 type MaxRunningLocker struct {
