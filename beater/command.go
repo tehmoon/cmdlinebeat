@@ -1,6 +1,7 @@
 package beater
 
 import (
+  "syscall"
   "fmt"
   "github.com/elastic/beats/libbeat/common"
   "github.com/elastic/beats/libbeat/logp"
@@ -21,6 +22,10 @@ type Command struct {
   Timeout time.Duration `config:"timeout"`
   Fields common.MapStr `config:"fields"`
   Name string `config:"name"`
+  User string `config:"user"`
+  Group string `config:"group"`
+  uid uint32
+  gid uint32
   entryNumber int
 }
 
@@ -35,10 +40,23 @@ func (command Command) Run(events chan *Event, sync chan struct{}) {
       break
     }
 
-    cmd := exec.Command(command.Shell, "-c", command.Command)
-    cmd.Env = env
     now := time.Now()
     id := GenerateId(8)
+
+    cmd := exec.Command(command.Shell, "-c", command.Command)
+    if IsRoot() {
+      cmd.SysProcAttr = &syscall.SysProcAttr{
+          Credential: &syscall.Credential{
+            Uid: command.uid,
+            Gid: command.gid,
+          },
+          Setsid: true,
+      }
+
+      logp.Info(fmt.Sprintf("Creating command %s id %s with uid: %d and gid: %d", command.Name, id, command.uid, command.gid))
+    }
+
+    cmd.Env = env
     if id == "" {
       logp.Err(errors.Errorf("Error generating new command id in command %s id %d", command.Name, id).Error())
       tries = decrementAfterSleep(tries, SLEEP_TIME)
@@ -66,6 +84,8 @@ func (command Command) Run(events chan *Event, sync chan struct{}) {
       tries = decrementAfterSleep(tries, SLEEP_TIME)
       continue
     }
+
+    logp.Info(fmt.Sprintf("Starting Command %s id %s", command.Name, id))
 
     lineRead, err := StartAndWaitCommand(cmd, doneReading)
     if err != nil {

@@ -3,15 +3,15 @@ A beat that will execute commands periodically and send every line as a single e
 
 ## Disclamer
 This program executes commands and send the output to whatever you configured.
-Cmdlinebeat doesn't do any security checks nor sandboxing, so be really careful to
-**not run this as root** and remember that:
+
+`Cmdlinebeat` doesn't do any security checks nor sandboxing, so remember that:
 
   - what ever you execute can impact your system -- or remote systems
   - what ever you execute can leak sensitive informations
   - what ever you execute will be executed with the user that runs `cmdlinebeat` so make sure the user has a restricted access to what it should have
-  - running `cmdlinebeat` in a container with the `root` user **must still be avoided**
-
-I'm planing on dropping the privileges on every command so it is safe to run, until then please respect the guidelines.
+  - running `cmdlinebeat` in a container as `root` just because you're in a container will come back haunting you
+  - when running `cmdlinbeat` as `root` it will by default executes everything as `nobody`. Use only `root` if you have multiple command to run
+    with multiple different user
 
 ## Installation
 There are two ways you can install cmdlinebeat:
@@ -44,6 +44,8 @@ cmdlinebeat.commands:
     env:               # additional environment variable to pass to the child process. Will override cmdlinebeat.env if found.
     copy_env: false    # copy all environment to child process
     timeout: 0         # NYI: kill process if timeout is reached
+    user: user/uid     # Username to execute the command with. Require root privs. Default to "nobody"
+    group: group/gid   # Groupname to execute the group with. Require root privs, default to main user group
 ```
 
 ## Example Configuration

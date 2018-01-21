@@ -94,6 +94,11 @@ func New(b *beat.Beat, config *common.Config) (beat.Beater, error) {
       command.Env = make(map[string]string)
     }
 
+    command.uid, command.gid, err = GetUserGroupIds(command.User, command.Group)
+    if err != nil {
+      return nil, errors.Wrapf(err, "Config for command %s has an error in user or group field", command.Name)
+    }
+
     for k, v := range cmdlinebeat.Env {
       if _, found := command.Env[k]; ! found {
         command.Env[k] = v
