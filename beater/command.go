@@ -2,7 +2,6 @@ package beater
 
 import (
   "fmt"
-  "github.com/elastic/beats/libbeat/beat"
   "github.com/elastic/beats/libbeat/common"
   "github.com/elastic/beats/libbeat/logp"
   "time"
@@ -25,19 +24,7 @@ type Command struct {
   entryNumber int
 }
 
-func (command Command) Run(b *beat.Beat, sync chan struct{}) {
-  config := beat.ClientConfig{
-    EventMetadata: common.EventMetadata{
-      Fields: command.Fields,
-    },
-  }
-
-  client, err := b.Publisher.ConnectWith(config)
-  if err != nil {
-    logp.Err(errors.Wrapf(err, "Enable to connect the publisher for command %s", command.Name).Error())
-    return
-  }
-
+func (command Command) Run(events chan *Event, sync chan struct{}) {
   tries := 3
   env := ForkEnv(command.Env, command.CopyEnv)
 
@@ -53,14 +40,14 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
     now := time.Now()
     id := GenerateId(8)
     if id == "" {
-      logp.Err(errors.Errorf("Error generating new command id in command %s", command.Name).Error())
+      logp.Err(errors.Errorf("Error generating new command id in command %s id %d", command.Name, id).Error())
       tries = decrementAfterSleep(tries, SLEEP_TIME)
       continue
     }
 
     stderrChan, err := CreateAndReadAllFromFn(cmd.StderrPipe)
     if err != nil {
-      logp.Err(errors.Wrapf(err, "Error in reading from stderr in command %s", command.Name).Error())
+      logp.Err(errors.Wrapf(err, "Error in reading from stderr in command %s id %s", command.Name, id).Error())
       tries = decrementAfterSleep(tries, SLEEP_TIME)
       continue
     }
@@ -68,13 +55,13 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
     go func() {
       err := <- stderrChan
       if err != nil {
-        logp.Err(errors.Wrapf(err, "Error in command %s, retrying...", command.Name).Error())
+        logp.Err(errors.Wrapf(err, "Error in command %s id %s, retrying...", command.Name, id).Error())
       }
     }()
 
-    doneReading, err := ReadLineFromReaderFnAndPublish(cmd.StdoutPipe, client, &command, now, id)
+    doneReading, err := ReadLineFromReaderFnAndPublish(cmd.StdoutPipe, &command, now, id, events)
     if err != nil {
-      logp.Err(errors.Wrapf(err, "Unable to open stdout in command %s, retrying...", command.Name).Error())
+      logp.Err(errors.Wrapf(err, "Unable to open stdout in command %s id %s, retrying...", command.Name, id).Error())
 
       tries = decrementAfterSleep(tries, SLEEP_TIME)
       continue
@@ -82,13 +69,13 @@ func (command Command) Run(b *beat.Beat, sync chan struct{}) {
 
     lineRead, err := StartAndWaitCommand(cmd, doneReading)
     if err != nil {
-      logp.Err(errors.Wrapf(err, "Error starting or waiting command %s after %d line read, retrying...", command.Name, lineRead).Error())
+      logp.Err(errors.Wrapf(err, "Error starting or waiting command %s id %s after %d line read, retrying...", command.Name, id, lineRead).Error())
 
       tries = decrementAfterSleep(tries, SLEEP_TIME)
       continue
     }
 
-    logp.Info(fmt.Sprintf("Command %s has sent %d lines", command.Name, lineRead))
+    logp.Info(fmt.Sprintf("Command %s id %s has sent %d lines", command.Name, id, lineRead))
     time.Sleep(command.Sleep)
   }
 
@@ -141,7 +128,7 @@ func CreateAndReadAllFromFn(fn func() (io.ReadCloser, error)) (chan error, error
   return syncBack, nil
 }
 
-func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), client beat.Client, command *Command, now time.Time, id string) (chan int64, error) {
+func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), command *Command, now time.Time, id string, events chan *Event) (chan int64, error) {
   r, err := fn()
   if err != nil {
     return nil, errors.Wrap(err, "Error creating reader")
@@ -174,18 +161,17 @@ func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), client bea
         line = line[:len(line) - 1]
       }
 
-      client.Publish(beat.Event{
-        Timestamp: time.Now(),
-        Fields: common.MapStr{
-          "cmdlinebeat": &common.MapStr{
-            "line": line,
-            "number": i,
-            "id": id,
-            "name": command.Name,
-            "started_at": now,
-          },
+
+      events <- &Event{
+        Fields: command.Fields,
+        BeatEvent: common.MapStr{
+          "line": line,
+          "number": i,
+          "id": id,
+          "name": command.Name,
+          "started_at": now,
         },
-      })
+      }
     }
 
     done <- i

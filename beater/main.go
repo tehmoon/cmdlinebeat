@@ -6,6 +6,7 @@ import (
   "github.com/elastic/beats/libbeat/beat"
   "github.com/elastic/beats/libbeat/common"
   "strings"
+  "time"
   "runtime"
 )
 
@@ -15,10 +16,30 @@ type Cmdlinebeat struct {
 }
 
 func (cmdlinebeat *Cmdlinebeat) Run(b *beat.Beat) (error) {
+  client, err := b.Publisher.Connect()
+  if err != nil {
+    return errors.Wrap(err, "Error connecting to the publisher")
+  }
+
   sync := make(chan struct{})
+  events := make(chan *Event)
+
+  go func() {
+    for {
+      event := <- events
+
+      client.Publish(beat.Event{
+        Timestamp: time.Now(),
+        Fields: common.MapStr{
+          "fields": event.Fields,
+          "cmdlinebeat": event.BeatEvent,
+        },
+      })
+    }
+  }()
 
   for _, command := range cmdlinebeat.Commands {
-    go command.Run(b, sync)
+    go command.Run(events, sync)
   }
 
   for range cmdlinebeat.Commands {

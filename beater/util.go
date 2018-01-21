@@ -2,6 +2,7 @@ package beater
 
 import (
   "time"
+  "github.com/elastic/beats/libbeat/common"
   "fmt"
   "os"
   "crypto/rand"
@@ -48,4 +49,9 @@ func GenerateId(n int64) (string) {
   }
 
   return fmt.Sprintf("%x", buff)
+}
+
+type Event struct {
+  Fields common.MapStr
+  BeatEvent common.MapStr
 }
