@@ -14,14 +14,8 @@ import (
 
 var (
   SLEEP_TIME = 5 * time.Second
+  MAX_TRIES = 3
 )
-
-func decrementAfterSleep(i int, sleep time.Duration) (int) {
-  time.Sleep(sleep)
-
-  i--
-  return i
-}
 
 func ForkEnv(env map[string]string, inherit bool) ([]string) {
   newEnv := make([]string, 0)

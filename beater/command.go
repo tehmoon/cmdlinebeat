@@ -29,74 +29,79 @@ type Command struct {
   entryNumber int
 }
 
+func RunCommand(command *Command, env []string, events chan *Event) (error) {
+  now := time.Now()
+  id := GenerateId(8)
+
+  cmd := exec.Command(command.Shell, "-c", command.Command)
+  if IsRoot() {
+    cmd.SysProcAttr = &syscall.SysProcAttr{
+        Credential: &syscall.Credential{
+          Uid: command.uid,
+          Gid: command.gid,
+        },
+        Setsid: true,
+    }
+
+    logp.Info(fmt.Sprintf("Creating command %s id %s with uid: %d and gid: %d", command.Name, id, command.uid, command.gid))
+  }
+
+  cmd.Env = env
+  if id == "" {
+    return errors.Errorf("Error generating new command id in command %s id %d", command.Name, id)
+  }
+
+  stderrChan, err := CreateAndReadAllFromFn(cmd.StderrPipe)
+  if err != nil {
+    return errors.Wrapf(err, "Error in reading from stderr in command %s id %s", command.Name, id)
+  }
+
+  go func() {
+    err := <- stderrChan
+    if err != nil {
+      logp.Err(errors.Wrapf(err, "Error in command %s id %s, retrying...", command.Name, id).Error())
+    }
+  }()
+
+  doneReading, err := ReadLineFromReaderFnAndPublish(cmd.StdoutPipe, command, now, id, events)
+  if err != nil {
+    return errors.Wrapf(err, "Unable to open stdout in command %s id %s, retrying...", command.Name, id)
+  }
+
+  logp.Info(fmt.Sprintf("Starting Command %s id %s", command.Name, id))
+
+  lineRead, err := StartAndWaitCommand(cmd, doneReading)
+  if err != nil {
+    return errors.Wrapf(err, "Error starting or waiting command %s id %s after %d line read, retrying...", command.Name, id, lineRead)
+  }
+
+  logp.Info(fmt.Sprintf("Command %s id %s has sent %d lines", command.Name, id, lineRead))
+
+  return nil
+}
+
+
 func (command Command) Run(events chan *Event, sync chan struct{}) {
-  tries := 3
+  tries := 0
   env := ForkEnv(command.Env, command.CopyEnv)
 
   for {
-    if tries == 0 {
-      logp.Err("Stop retrying command %s after 3 tries", command.Name)
+    if tries == MAX_TRIES {
+      logp.Err("Stop retrying command %s after %d sequential tries", command.Name, MAX_TRIES)
 
       break
     }
 
-    now := time.Now()
-    id := GenerateId(8)
-
-    cmd := exec.Command(command.Shell, "-c", command.Command)
-    if IsRoot() {
-      cmd.SysProcAttr = &syscall.SysProcAttr{
-          Credential: &syscall.Credential{
-            Uid: command.uid,
-            Gid: command.gid,
-          },
-          Setsid: true,
-      }
-
-      logp.Info(fmt.Sprintf("Creating command %s id %s with uid: %d and gid: %d", command.Name, id, command.uid, command.gid))
-    }
-
-    cmd.Env = env
-    if id == "" {
-      logp.Err(errors.Errorf("Error generating new command id in command %s id %d", command.Name, id).Error())
-      tries = decrementAfterSleep(tries, SLEEP_TIME)
-      continue
-    }
-
-    stderrChan, err := CreateAndReadAllFromFn(cmd.StderrPipe)
+    err := RunCommand(&command, env, events)
     if err != nil {
-      logp.Err(errors.Wrapf(err, "Error in reading from stderr in command %s id %s", command.Name, id).Error())
-      tries = decrementAfterSleep(tries, SLEEP_TIME)
+      logp.Err(err.Error())
+      tries++
+      time.Sleep(SLEEP_TIME)
       continue
     }
 
-    go func() {
-      err := <- stderrChan
-      if err != nil {
-        logp.Err(errors.Wrapf(err, "Error in command %s id %s, retrying...", command.Name, id).Error())
-      }
-    }()
-
-    doneReading, err := ReadLineFromReaderFnAndPublish(cmd.StdoutPipe, &command, now, id, events)
-    if err != nil {
-      logp.Err(errors.Wrapf(err, "Unable to open stdout in command %s id %s, retrying...", command.Name, id).Error())
-
-      tries = decrementAfterSleep(tries, SLEEP_TIME)
-      continue
-    }
-
-    logp.Info(fmt.Sprintf("Starting Command %s id %s", command.Name, id))
-
-    lineRead, err := StartAndWaitCommand(cmd, doneReading)
-    if err != nil {
-      logp.Err(errors.Wrapf(err, "Error starting or waiting command %s id %s after %d line read, retrying...", command.Name, id, lineRead).Error())
-
-      tries = decrementAfterSleep(tries, SLEEP_TIME)
-      continue
-    }
-
-    logp.Info(fmt.Sprintf("Command %s id %s has sent %d lines", command.Name, id, lineRead))
-    time.Sleep(command.Sleep)
+    tries = 0
+    time.Sleep(SLEEP_TIME)
   }
 
   sync <- struct{}{}
