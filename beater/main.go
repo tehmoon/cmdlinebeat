@@ -6,18 +6,42 @@ import (
   "github.com/elastic/beats/libbeat/beat"
   "github.com/elastic/beats/libbeat/common"
   "strings"
+  "time"
   "runtime"
 )
 
 type Cmdlinebeat struct {
   Commands []*Command `config:"commands"`
+  Env map[string]string `config:"env"`
+  MaxRunning uint16 `config:"max-running"`
 }
 
 func (cmdlinebeat *Cmdlinebeat) Run(b *beat.Beat) (error) {
+  client, err := b.Publisher.Connect()
+  if err != nil {
+    return errors.Wrap(err, "Error connecting to the publisher")
+  }
+
   sync := make(chan struct{})
+  events := make(chan *Event)
+  mrl := NewMaxRunningLocker(cmdlinebeat.MaxRunning)
+
+  go func() {
+    for {
+      event := <- events
+
+      client.Publish(beat.Event{
+        Timestamp: time.Now(),
+        Fields: common.MapStr{
+          "fields": event.Fields,
+          "cmdlinebeat": event.BeatEvent,
+        },
+      })
+    }
+  }()
 
   for _, command := range cmdlinebeat.Commands {
-    go command.Run(b, sync)
+    go command.Run(events, mrl, sync)
   }
 
   for range cmdlinebeat.Commands {
@@ -40,6 +64,7 @@ func New(b *beat.Beat, config *common.Config) (beat.Beater, error) {
 
   cmdlinebeat := &Cmdlinebeat{
     Commands: make([]*Command, 0),
+    Env: make(map[string]string),
   }
 
   err := config.Unpack(cmdlinebeat)
@@ -58,13 +83,32 @@ func New(b *beat.Beat, config *common.Config) (beat.Beater, error) {
       return nil, errors.Errorf("Config #%d is missing a name entry", entryNumber)
     }
 
+    if int64(command.Sleep) < 0 {
+      return nil, errors.Errorf("Config #%d has sleep duration negative", entryNumber)
+    }
+
     if command.Shell == "" {
       shell := os.Getenv("SHELL")
       if shell == "" {
-        return nil, errors.Errorf("Config #%d is missing a shell entry and SHELL environment variable is not found", entryNumber)
+        return nil, errors.Errorf("Config for command %s is missing a shell entry and SHELL environment variable is not found", command.Name)
       }
 
       command.Shell = shell
+    }
+
+    if command.Env == nil {
+      command.Env = make(map[string]string)
+    }
+
+    command.uid, command.gid, err = GetUserGroupIds(command.User, command.Group)
+    if err != nil {
+      return nil, errors.Wrapf(err, "Config for command %s has an error in user or group field", command.Name)
+    }
+
+    for k, v := range cmdlinebeat.Env {
+      if _, found := command.Env[k]; ! found {
+        command.Env[k] = v
+      }
     }
 
     command.entryNumber = entryNumber
