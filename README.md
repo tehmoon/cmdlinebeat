@@ -34,7 +34,8 @@ go build # A binary name cmdlinebeat will be generated in the directory
 ## Configuration file
 
 ```
-cmdlinebeat.env:       # Global variable to pass to commands
+cmdlinebeat.env:                # Global variable to pass to commands
+cmdlinebeat.max-running: uint16 # Max number of command to execute in parrallele
 cmdlinebeat.commands:
   - command: ls /      # Command you want to run in a shell.
     name: ls_slash_1_s # Name of you command
@@ -53,6 +54,7 @@ cmdlinebeat.commands:
 ```
 cmdlinebeat.env:
   AWS_PROFILE: dev
+cmdlinebeat.max-running: 1
 cmdlinebeat.commands:
 # Will get the size of all directories at depth=1 every hour from my_test_bucket
   - command: s3-du -d 1 -b my_test_bucket

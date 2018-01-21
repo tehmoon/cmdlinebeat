@@ -13,6 +13,7 @@ import (
 type Cmdlinebeat struct {
   Commands []*Command `config:"commands"`
   Env map[string]string `config:"env"`
+  MaxRunning uint16 `config:"max-running"`
 }
 
 func (cmdlinebeat *Cmdlinebeat) Run(b *beat.Beat) (error) {
@@ -23,6 +24,7 @@ func (cmdlinebeat *Cmdlinebeat) Run(b *beat.Beat) (error) {
 
   sync := make(chan struct{})
   events := make(chan *Event)
+  mrl := NewMaxRunningLocker(cmdlinebeat.MaxRunning)
 
   go func() {
     for {
@@ -39,7 +41,7 @@ func (cmdlinebeat *Cmdlinebeat) Run(b *beat.Beat) (error) {
   }()
 
   for _, command := range cmdlinebeat.Commands {
-    go command.Run(events, sync)
+    go command.Run(events, mrl, sync)
   }
 
   for range cmdlinebeat.Commands {

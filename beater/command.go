@@ -29,7 +29,10 @@ type Command struct {
   entryNumber int
 }
 
-func RunCommand(command *Command, env []string, events chan *Event) (error) {
+func RunCommand(command *Command, env []string, events chan *Event, mrl *MaxRunningLocker) (error) {
+  mrl.Lock()
+  defer mrl.Unlock()
+
   now := time.Now()
   id := GenerateId(8)
 
@@ -81,7 +84,7 @@ func RunCommand(command *Command, env []string, events chan *Event) (error) {
 }
 
 
-func (command Command) Run(events chan *Event, sync chan struct{}) {
+func (command Command) Run(events chan *Event, mrl *MaxRunningLocker, sync chan struct{}) {
   tries := 0
   env := ForkEnv(command.Env, command.CopyEnv)
 
@@ -92,7 +95,7 @@ func (command Command) Run(events chan *Event, sync chan struct{}) {
       break
     }
 
-    err := RunCommand(&command, env, events)
+    err := RunCommand(&command, env, events, mrl)
     if err != nil {
       logp.Err(err.Error())
       tries++

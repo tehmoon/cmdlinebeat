@@ -151,3 +151,31 @@ func IsRoot() (bool) {
 
   return u.Uid == "0"
 }
+
+type MaxRunningLocker struct {
+  sync chan struct{}
+  n uint16
+}
+
+func NewMaxRunningLocker(n uint16) (*MaxRunningLocker) {
+  return &MaxRunningLocker{
+    sync: make(chan struct{}, int64(n)),
+    n: n,
+  }
+}
+
+func (mrl MaxRunningLocker) Lock() {
+  if mrl.n == 0 {
+    return
+  }
+
+  mrl.sync <- struct{}{}
+}
+
+func (mrl MaxRunningLocker) Unlock() {
+  if mrl.n == 0 {
+    return
+  }
+
+  <- mrl.sync
+}
