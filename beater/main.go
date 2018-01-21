@@ -81,6 +81,10 @@ func New(b *beat.Beat, config *common.Config) (beat.Beater, error) {
       return nil, errors.Errorf("Config #%d is missing a name entry", entryNumber)
     }
 
+    if int64(command.Sleep) < 0 {
+      return nil, errors.Errorf("Config #%d has sleep duration negative", entryNumber)
+    }
+
     if command.Shell == "" {
       shell := os.Getenv("SHELL")
       if shell == "" {
