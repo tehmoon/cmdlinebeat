@@ -58,10 +58,6 @@ func GetUserGroupIds(userStr, groupStr string) (uint32, uint32, error) {
 
   if userStr == "" {
     userStr = "nobody"
-
-    if groupStr == "" {
-      groupStr = "nobody"
-    }
   }
 
   u, err := getUserId(userStr)
