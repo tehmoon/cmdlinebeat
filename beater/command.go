@@ -189,7 +189,6 @@ func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), command *C
         line = line[:len(line) - 1]
       }
 
-
       events <- &Event{
         Fields: command.Fields,
         BeatEvent: common.MapStr{
@@ -198,8 +197,19 @@ func ReadLineFromReaderFnAndPublish(fn func() (io.ReadCloser, error), command *C
           "id": id,
           "name": command.Name,
           "started_at": now,
+          "status": "running",
         },
       }
+    }
+
+    events <- &Event{
+      Fields: command.Fields,
+      BeatEvent: common.MapStr{
+        "id": id,
+        "name": command.Name,
+        "started_at": now,
+        "status": "stopped",
+      },
     }
 
     done <- i
