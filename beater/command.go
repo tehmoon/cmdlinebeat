@@ -104,7 +104,7 @@ func (command Command) Run(events chan *Event, mrl *MaxRunningLocker, sync chan 
     }
 
     tries = 0
-    time.Sleep(SLEEP_TIME)
+    time.Sleep(command.Sleep)
   }
 
   sync <- struct{}{}
