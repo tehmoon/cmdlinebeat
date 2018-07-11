@@ -1,5 +1,5 @@
 #!/bin/sh
-version=6.0.0
+version=6.3.1
 
 rm *.tar.gz 2>/dev/null
 
