@@ -1,5 +1,5 @@
 #!/bin/sh
-version=6.0.0
+version=6.3.1
 
 rm *.tar.gz 2>/dev/null
 
@@ -11,7 +11,7 @@ do
   GOARCH=amd64
   dir=cmdlinebeat-${version}-${GOOS}-x86_64
 
-  GOOS=${GOOS} GOARCH=${GOARCH} go build
+  GOOS=${GOOS} GOARCH=${GOARCH} go build -buildmode exe -ldflags '-linkmode internal -extldflags "-static -w -s"'
   mkdir ${dir}
   cp -r README.md cmdlinebeat cmdlinebeat.yml ${dir}
   tar -cvvzf ${dir}.tar.gz ${dir}
