@@ -31,6 +31,10 @@ go build # A binary name cmdlinebeat will be generated in the directory
 ./cmdlinebeat -c cmdlinebeat.yml
 ```
 
+## Caveats
+
+Since `beats` `6.4` `seccomp` is enabled by defaults on `exec` and others. This library relies on the hability to exec commands. This is why there is a `seccomp.enabled: false` in the config file.
+
 ## Configuration file
 
 ```

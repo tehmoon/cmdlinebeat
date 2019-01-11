@@ -9,3 +9,5 @@ cmdlinebeat.env:
 
 output.console:
   pretty: true
+
+seccomp.enabled: false
