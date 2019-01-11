@@ -1,3 +1,5 @@
+.go
+.builds
 *.swp
 cmdlinebeat-*.tar.gz
 cmdlinebeat
