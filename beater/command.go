@@ -23,7 +23,6 @@ type Command struct {
   Fields common.MapStr `config:"fields"`
   Name string `config:"name"`
   User string `config:"user"`
-  Group string `config:"group"`
   uid uint32
   gid uint32
   entryNumber int

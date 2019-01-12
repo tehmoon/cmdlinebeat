@@ -2,7 +2,7 @@ package beater
 
 import (
   "strconv"
-  "os/user"
+	"os/exec"
   "github.com/tehmoon/errors"
   "time"
   "github.com/elastic/beats/libbeat/common"
@@ -53,66 +53,66 @@ type Event struct {
   BeatEvent common.MapStr
 }
 
-func GetUserGroupIds(userStr, groupStr string) (uint32, uint32, error) {
+func GetUserGroupIds(userStr string) (uint32, uint32, error) {
   maxUint32 := uint32((1<<32) - 1)
 
   if userStr == "" {
     userStr = "nobody"
   }
 
-  u, err := getUserId(userStr)
+  uid, err := getUserId(userStr)
   if err != nil {
-    return maxUint32, maxUint32, errors.Wrap(err, "Error resolving user")
+    return maxUint32, maxUint32, errors.Wrap(err, "Error resolving user id")
   }
 
-  if groupStr == "" {
-    groupStr = u.Gid
-  }
-
-  g, err := getGroupId(groupStr)
+  gid, err := getGroupId(userStr)
   if err != nil {
-    return maxUint32, maxUint32, errors.Wrap(err, "Error resolving group")
-  }
-
-  uid, err := strconv.ParseUint(u.Uid, 10, 32)
-  if err != nil {
-    return maxUint32, maxUint32, errors.Wrap(err, "Error parsing uid")
-  }
-
-  gid, err := strconv.ParseUint(g.Gid, 10, 32)
-  if err != nil {
-    return maxUint32, maxUint32, errors.Wrap(err, "Error parsing gid")
+    return maxUint32, maxUint32, errors.Wrap(err, "Error resolving group id")
   }
 
   return uint32(uid), uint32(gid), nil
 }
 
-func getUserId(userStr string) (*user.User, error) {
-  u, err := user.LookupId(userStr)
-  if err == nil {
-    return u, nil
-  }
+func getUserId(userStr string) (uint32, error) {
+	maxUint32 := uint32((1<<32) - 1)
 
-  u, err = user.Lookup(userStr)
+	cmd := exec.Command("/usr/bin/id", "-u", userStr)
+	output, err := cmd.CombinedOutput()
   if err != nil {
-    return nil, err
+    return maxUint32, errors.Wrapf(err, "Error calling %q: %s", "id", string(output[:]))
   }
 
-  return u, nil
+	if len(output) <= 1 {
+		return maxUint32, errors.Errorf("Something went wrong with the command %q", "id -u")
+	}
+
+  uid, err := strconv.ParseUint(string(output[:len(output) - 1]), 10, 32)
+  if err != nil {
+    return maxUint32, errors.Wrap(err, "Error parsing uid")
+  }
+
+	return uint32(uid), nil
 }
 
-func getGroupId(groupStr string) (*user.Group, error) {
-  g, err := user.LookupGroupId(groupStr)
-  if err == nil {
-    return g, nil
-  }
+func getGroupId(userStr string) (uint32, error) {
+	maxUint32 := uint32((1<<32) - 1)
 
-  g, err = user.LookupGroup(groupStr)
+	cmd := exec.Command("/usr/bin/id", "-g", userStr)
+	output, err := cmd.CombinedOutput()
   if err != nil {
-    return nil, err
+    return maxUint32, errors.Wrapf(err, "Error calling %q: %s", "id", string(output[:]))
   }
 
-  return g, nil
+	if len(output) <= 1 {
+		return maxUint32, errors.Errorf("Something went wrong with the command %q", "id -g")
+	}
+
+  gid, err := strconv.ParseUint(string(output[:len(output) - 1]), 10, 32)
+  if err != nil {
+    return maxUint32, errors.Wrap(err, "Error parsing gid")
+  }
+
+	return uint32(gid), nil
 }
 
 func IsRoot() (bool) {

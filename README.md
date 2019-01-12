@@ -49,8 +49,7 @@ cmdlinebeat.commands:
     env:               # additional environment variable to pass to the child process. Will override cmdlinebeat.env if found.
     copy_env: false    # copy all environment to child process
     timeout: 0         # NYI: kill process if timeout is reached
-    user: user/uid     # Username to execute the command with. Require root privs. Default to "nobody"
-    group: group/gid   # Groupname to execute the group with. Require root privs, default to main user group
+    user: user         # Username to execute the command with. Require root privs. Default to "nobody"
 ```
 
 ## Example Configuration
