@@ -23,14 +23,17 @@ type Command struct {
   Fields common.MapStr `config:"fields"`
   Name string `config:"name"`
   User string `config:"user"`
+	Bypass bool `config:"bypass"`
   uid uint32
   gid uint32
   entryNumber int
 }
 
 func RunCommand(command *Command, env []string, events chan *Event, mrl *MaxRunningLocker) (error) {
-  mrl.Lock()
-  defer mrl.Unlock()
+	if ! command.Bypass {
+		mrl.Lock()
+		defer mrl.Unlock()
+	}
 
   now := time.Now()
   id := GenerateId(8)

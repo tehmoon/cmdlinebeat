@@ -50,6 +50,7 @@ cmdlinebeat.commands:
     copy_env: false    # copy all environment to child process
     timeout: 0         # NYI: kill process if timeout is reached
     user: user         # Username to execute the command with. Require root privs. Default to "nobody"
+    bypass: false      # Bypass the max-running variable, use it only for lightweight commands
 ```
 
 ## Example Configuration
